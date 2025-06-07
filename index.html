@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantity Survey Application (Enhanced Visuals)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4f46e5; /* Indigo */
+            --primary-hover-color: #4338ca;
+            --secondary-color: #10b981; /* Emerald */
+            --secondary-hover-color: #059669;
+            --accent-color: #8b5cf6; /* Violet */
+            --accent-hover-color: #7c3aed;
+            --warning-color: #f59e0b; /* Amber */
+            --warning-hover-color: #d97706;
+            --danger-color: #ef4444; /* Red */
+            --danger-hover-color: #dc2626;
+            --info-color: #0ea5e9; /* Sky */
+            --info-hover-color: #0284c7;
+            --text-primary: #1f2937; /* Gray 800 */
+            --text-secondary: #4b5563; /* Gray 600 */
+            --text-muted: #6b7280; /* Gray 500 */
+            --bg-light: #f9fafb; /* Gray 50 */
+            --bg-white: #ffffff;
+            --border-color: #e5e7eb; /* Gray 200 */
+            --input-border-color: #d1d5db; /* Gray 300 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #eef2ff; /* Lighter Indigo tint for overall background */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            transition: background-image 0.5s ease-in-out;
+        }
+        body::before { /* Subtle gradient overlay instead of plain white for depth */
+            content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.1), rgba(255,255,255,0.3));
+            backdrop-filter: blur(5px); /* Slightly increased blur */
+            z-index: -1;
+        }
+        .main-content-wrapper { 
+            background-color: rgba(255, 255, 255, 0.97); /* More opaque for readability */
+            border-radius: 1rem; /* Softer rounded corners */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        .table-header { @apply bg-gray-100 text-gray-700 font-semibold p-3 text-left sticky top-0 z-10 border-b-2 border-gray-300 text-sm; } /* Reduced font for header */
+        .table-cell { @apply p-2 border-b border-gray-200 bg-white bg-opacity-95 text-xs; } /* Reduced font and padding for cells */
+        .table-cell.description-cell { max-width: 300px; /* Wider description column */ white-space: normal; word-break: break-word; }
+
+        .table-cell input, .table-cell select { 
+            @apply w-full p-1 border border-transparent hover:border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md box-border text-xs transition-all duration-150; /* Reduced font and padding for inputs in cells */
+        }
+        .input-field { 
+            @apply mt-1 block w-full px-3 py-2 bg-white border border-input-border-color rounded-md shadow-sm 
+                    focus:outline-none focus:ring-2 focus:ring-primary-color focus:border-primary-color 
+                    sm:text-sm transition-shadow duration-150; 
+        }
+        .label-text { @apply block text-sm font-medium var(--text-primary); }
+        
+        .btn { 
+            @apply px-4 py-2 rounded-lg font-semibold text-white shadow-md 
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 
+                    flex items-center justify-center transition-all duration-200 ease-in-out transform hover:scale-105; 
+        }
+        .btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); }
+        .btn-primary:hover { background-color: var(--primary-hover-color); }
+        .btn-secondary { background-color: var(--secondary-color); border-color: var(--secondary-color); }
+        .btn-secondary:hover { background-color: var(--secondary-hover-color); }
+        .btn-info { background-color: var(--info-color); border-color: var(--info-color); }
+        .btn-info:hover { background-color: var(--info-hover-color); }
+        .btn-accent { background-color: var(--accent-color); border-color: var(--accent-color); }
+        .btn-accent:hover { background-color: var(--accent-hover-color); }
+        .btn-warning { background-color: var(--warning-color); border-color: var(--warning-color); color: var(--text-primary); }
+        .btn-warning:hover { background-color: var(--warning-hover-color); }
+        .btn-danger { background-color: var(--danger-color); border-color: var(--danger-color); }
+        .btn-danger:hover { background-color: var(--danger-hover-color); }
+        .btn-disabled { @apply bg-gray-300 text-gray-500 cursor-not-allowed transform-none; }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #c5c5c5; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+        
+        .table-container { max-height: 400px; overflow-y: auto; border-radius: 0.5rem; border: 1px solid var(--border-color); }
+        
+        .loader {
+            border: 4px solid #e0e7ff; /* Lighter Indigo for track */
+            border-top: 4px solid var(--primary-color); /* Primary color for spinner */
+            border-radius: 50%; width: 18px; height: 18px;
+            animation: spin 0.8s linear infinite; display: inline-block; margin-left: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .modal { 
+            @apply fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full 
+                    flex justify-center items-center z-50 opacity-0 transition-opacity duration-300 ease-out;
+        }
+        .modal.open { @apply opacity-100; }
+        .modal-content { 
+            @apply bg-white p-6 sm:p-8 rounded-xl shadow-2xl w-11/12 md:w-2/3 lg:w-1/2 
+                    max-h-[85vh] flex flex-col transform scale-95 transition-transform duration-300 ease-out;
+        }
+        .modal.open .modal-content { @apply scale-100; }
+        .modal-body { @apply overflow-y-auto whitespace-pre-wrap text-gray-700; }
+        
+        .tab-button { 
+            @apply px-4 py-3 font-medium text-sm leading-5 rounded-t-lg 
+                    focus:outline-none border-b-2 border-transparent transition-all duration-200; 
+        }
+        .tab-button.active { 
+            @apply text-primary-color border-primary-color font-semibold; 
+        }
+        .tab-button:not(.active) { 
+            @apply text-text-muted hover:text-primary-color hover:border-gray-300; 
+        }
+        .tab-content { @apply p-6 bg-white rounded-lg shadow-lg mt-[-1px]; } /* Slight overlap for seamless look */
+
+        .section-title-icon { display: inline-block; width: 1.1em; height: 1.1em; margin-right: 0.4em; vertical-align: -0.1em; }
+        @keyframes iconFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-2px) rotate(-3deg); } 75% { transform: translateY(-2px) rotate(3deg); } }
+        .animated-icon { animation: iconFloat 2s ease-in-out infinite; }
+        
+        .header-logo { max-height: 45px; margin-right: 1rem; } /* Slightly smaller logo */
+        .doc-no-input { 
+            @apply p-1 border border-gray-300 rounded-md text-xs 
+                    focus:ring-1 focus:ring-primary-color focus:border-primary-color transition-shadow duration-150; 
+        }
+        #loadingOverlay p { font-size: 1.1rem; }
+    </style>
+    <script id="embeddedSurveyData" type="application/json">
+        null
+    </script>
+</head>
+<body class="p-4 md:p-8">
+    <div id="loadingOverlay" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-[100]" style="display: flex;">
+        <div class="loader" style="width: 60px; height: 60px; border-width: 5px; border-top-color: var(--primary-color);"></div>
+        <p class="mt-5 text-lg" style="color: var(--primary-color);">Loading Application Assets...</p>
+    </div>
+
+    <div class="container mx-auto max-w-7xl main-content-wrapper p-6 md:p-8">
+        <header class="mb-8 pb-6 border-b border-gray-300">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <div class="flex items-center mb-4 sm:mb-0">
+                    <img src="DNA logo-Black (1).png" alt="DNA Logo" class="header-logo" onerror="this.style.display='none'; const logoFallback = document.createElement('span'); logoFallback.textContent = 'DNA'; logoFallback.className='font-bold text-xl mr-4 text-gray-700'; this.parentNode.insertBefore(logoFallback, this);">
+                    <div>
+                        <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--primary-color);">Quantity Survey Application</h1>
+                        <p class="text-sm" style="color: var(--text-muted);">This App is Made by Adlan</p>
+                    </div>
+                </div>
+                <div class="text-right w-full sm:w-auto">
+                    <div id="currentTime" class="text-xl font-semibold" style="color: var(--text-primary);">--:-- --</div>
+                    <div id="documentNumberContainer" class="text-xs text-gray-600 mt-1 flex flex-wrap gap-x-2 gap-y-1 items-center justify-end">
+                        <span>Doc No: DNA -</span> 
+                        <input type="date" id="docDate" class="doc-no-input" style="width: auto; min-width: 120px;"> 
+                        <span>- Rev:</span> <input type="text" id="docRevision" class="doc-no-input" style="width: 50px;" placeholder="0"> 
+                        <span>- No:</span> <input type="text" id="docNum" class="doc-no-input" style="width: 60px;" placeholder="001">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section id="projectInfoSection" class="mb-8 p-6 bg-gray-50 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold mb-5 flex items-center" style="color: var(--text-primary);">
+                <span id="iconProjectInfo" class="section-title-icon"></span>Project Information
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div><label for="projectDate" class="label-text">Project Date</label><input type="date" id="projectDate" class="input-field"></div>
+                <div><label for="clientName" class="label-text">Client's Name</label><input type="text" id="clientName" class="input-field" placeholder="Enter client name"></div>
+                <div><label for="projectName" class="label-text">Project's Name</label><input type="text" id="projectName" class="input-field" placeholder="Enter project name"></div>
+                <div><label for="projectLocation" class="label-text">Location</label><input type="text" id="projectLocation" class="input-field" placeholder="Enter location"></div>
+            </div>
+        </section>
+
+        <div class="mb-1"> <nav class="-mb-px flex space-x-1" aria-label="Tabs">
+                <button id="tabDatabaseBtn" class="tab-button active" data-tab="databaseTab">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 00-1 1v2a1 1 0 001 1h6a1 1 0 001-1V5a1 1 0 00-1-1H7zM6 9a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1V9zm1 5a1 1 0 00-1 1v2a1 1 0 102 0v-2a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                    Item Database
+                </button>
+                <button id="tabTakeOffBtn" class="tab-button" data-tab="takeOffTab">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 inline-block" viewBox="0 0 20 20" fill="currentColor"><path d="M17.586 2.414a1 1 0 00-1.414 0L12 6.586V3a1 1 0 10-2 0v3.586L5.828 2.414a1 1 0 00-1.414 1.414L8.586 8H5a1 1 0 100 2h3.586L4.414 14.172a1 1 0 001.414 1.414L10 11.414V17a1 1 0 102 0v-5.586l4.172 4.172a1 1 0 001.414-1.414L11.414 10H15a1 1 0 100 2h-3.586l4.172-4.172a1 1 0 000-1.414z" /></svg>
+                    Project Take-Off
+                </button>
+            </nav>
+        </div>
+
+        <div id="databaseTab" class="tab-content">
+            <section id="inputFormSection" class="mb-8 p-6 bg-gray-100 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-semibold mb-6 flex items-center" style="color: var(--text-primary);">
+                    <span id="iconAddItemDb" class="section-title-icon"></span>Add New Item to Database
+                </h2>
+                <form id="surveyForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+                    <div><label for="itemName" class="label-text">Item Name <span class="text-red-500">*</span></label><input type="text" id="itemName" class="input-field" required></div>
+                    <div><label for="category" class="label-text">Category <span class="text-red-500">*</span></label>
+                        <select id="category" class="input-field" required>
+                            <option value="">Select Category</option><option value="Construction Materials">Construction Materials</option><option value="Services">Services</option><option value="Equipment">Equipment</option><option value="Supplier">Supplier</option><option value="Labour">Labour</option><option value="Subcontractor Works">Subcontractor Works</option><option value="Preliminaries">Preliminaries</option><option value="Provisional Sums">Provisional Sums</option><option value="Prime Cost Sums">Prime Cost Sums</option><option value="Contingencies">Contingencies</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2 lg:col-span-1">
+                        <label for="description" class="label-text">Description (Summary)</label>
+                        <div class="flex items-start space-x-2"> <textarea id="description" rows="3" class="input-field flex-grow" placeholder="Click ✨ to generate summary (max 150 words)"></textarea>
+                            <button type="button" id="suggestDescriptionBtn" class="btn btn-accent p-2.5 h-auto mt-1 self-start" title="✨ Suggest Description Summary">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                                <span id="descriptionLoader" class="loader hidden"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div><label for="quantity" class="label-text">Default Qty (for DB)</label><input type="number" id="quantity" class="input-field" value="1" min="0" step="any"></div>
+                    <div><label for="unit" class="label-text">Unit <span class="text-red-500">*</span></label>
+                        <input type="text" id="unit" class="input-field" list="commonUnits" required>
+                        <datalist id="commonUnits">
+                            <option value="pcs"></option><option value="nos"></option><option value="unit"></option><option value="set"></option><option value="ls"></option><option value="m"></option><option value="m2"></option><option value="m3"></option><option value="kg"></option><option value="tonne"></option><option value="ltr"></option><option value="hr"></option><option value="day"></option><option value="wk"></option><option value="mth"></option><option value="sum"></option><option value="item"></option><option value="pallet"></option><option value="bag"></option><option value="box"></option><option value="lorry (6 tyre-5 tan)"></option><option value="lorry (12 tyre-20 tan)"></option>
+                        </datalist>
+                    </div>
+                    <div><label for="priceRate" class="label-text">Your Price Rate (RM) <span class="text-red-500">*</span></label><input type="number" id="priceRate" class="input-field" min="0" step="0.01" required></div>
+                    
+                    <div class="md:col-span-1">
+                        <label for="avgMarketPrice" class="label-text">Avg. Market Price (RM)</label>
+                        <div class="flex items-start space-x-2">
+                            <input type="text" id="avgMarketPrice" class="input-field bg-gray-100 flex-grow" readonly placeholder="Click ✨ to fetch">
+                            <button type="button" id="fetchAvgMarketPriceBtn" class="btn btn-warning p-2.5 h-auto mt-1 self-start" title="✨ Fetch Avg. Market Price">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                                <span id="avgMarketPriceLoader" class="loader hidden"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2"><label for="totalAmountDisplay" class="label-text">Total (Default Qty * Your Rate)</label><input type="text" id="totalAmountDisplay" class="input-field bg-gray-100" readonly></div>
+                    
+                    <div class="md:col-span-3 text-right mt-3">
+                        <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" /></svg>
+                            Add Item to Database
+                        </button>
+                    </div>
+                </form>
+            </section>
+            <section id="savedTabulationSection">
+                <h2 class="text-2xl font-semibold mb-5 flex items-center" style="color: var(--text-primary);">
+                    <span id="iconItemDbList" class="section-title-icon"></span>Item Database (Editable)
+                </h2>
+                <div class="overflow-x-auto shadow-lg rounded-lg table-container">
+                    <table class="min-w-full">
+                        <thead class="sticky top-0 z-10"><tr>
+                            <th class="table-header">Item Name</th><th class="table-header">Category</th><th class="table-header description-header">Description</th>
+                            <th class="table-header text-right">Default Qty</th><th class="table-header">Unit</th>
+                            <th class="table-header text-right">Price Rate (RM)</th><th class="table-header text-right">Total (RM)</th>
+                            <th class="table-header w-20 text-center">Actions</th>
+                        </tr></thead>
+                        <tbody id="mainTableBody"><tr><td colspan="8" class="text-center p-6 text-gray-500 bg-white bg-opacity-90">No items in database.</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div id="takeOffTab" class="tab-content hidden">
+            <section id="takeOffInputSection" class="mb-8 p-6 bg-gray-100 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-semibold mb-6 flex items-center" style="color: var(--text-primary);">
+                    <span id="iconAddItemTakeOff" class="section-title-icon"></span>Add Item to Take-Off List
+                </h2>
+                <form id="takeOffForm" class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                    <div class="md:col-span-2">
+                        <label for="takeOffItemSelect" class="label-text">Select Item from Database <span class="text-red-500">*</span></label>
+                        <select id="takeOffItemSelect" class="input-field" required>
+                            <option value="">-- Select an Item --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="takeOffQuantity" class="label-text">Quantity Needed <span class="text-red-500">*</span></label>
+                        <input type="number" id="takeOffQuantity" class="input-field" min="0" step="any" required>
+                    </div>
+                    <div class="md:col-span-3 bg-indigo-50 p-4 rounded-lg grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2 text-sm">
+                        <div><span class="font-medium text-indigo-700">Category:</span> <span id="takeOffItemCategoryDisplay" class="text-gray-800">-</span></div>
+                        <div><span class="font-medium text-indigo-700">Unit:</span> <span id="takeOffItemUnitDisplay" class="text-gray-800">-</span></div>
+                        <div><span class="font-medium text-indigo-700">Rate (RM):</span> <span id="takeOffItemRateDisplay" class="text-gray-800">-</span></div>
+                        <div class="sm:col-span-3"><span class="font-medium text-indigo-700">Description:</span> <span id="takeOffItemDescriptionDisplay" class="block text-xs text-gray-700 mt-1">-</span></div>
+                    </div>
+                    <div class="md:col-span-3 text-right mt-3">
+                        <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                            Add to Take-Off List
+                        </button>
+                    </div>
+                </form>
+            </section>
+            <section id="takeOffListSection">
+                <h2 class="text-2xl font-semibold mb-5 flex items-center" style="color: var(--text-primary);">
+                    <span id="iconTakeOffList" class="section-title-icon"></span>Project Take-Off List (Editable Quantity)
+                </h2>
+                <div class="overflow-x-auto shadow-lg rounded-lg table-container">
+                    <table class="min-w-full">
+                        <thead class="sticky top-0 z-10"><tr>
+                            <th class="table-header">Item Name</th><th class="table-header">Category</th><th class="table-header description-header">Description</th>
+                            <th class="table-header text-right">Qty Needed</th><th class="table-header">Unit</th>
+                            <th class="table-header text-right">Price Rate (RM)</th><th class="table-header text-right">Total Amount (RM)</th>
+                            <th class="table-header w-20 text-center">Actions</th>
+                        </tr></thead>
+                        <tbody id="takeOffListTableBody"><tr><td colspan="8" class="text-center p-6 text-gray-500 bg-white bg-opacity-90">No items in take-off list.</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <section class="my-10 flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center border-t border-gray-300 pt-8">
+            <button id="generateScopeSummaryBtn" class="btn btn-warning w-full sm:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                Generate Scope Summary
+                <span id="scopeLoader" class="loader hidden"></span>
+            </button>
+            <button id="saveToFileButton" class="btn btn-info w-full sm:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M5.5 16.5A2.503 2.503 0 008 19h4a2.503 2.503 0 002.5-2.5V13h-9v3.5zM16.5 8H13V1.5A2.503 2.503 0 0010.5 0h-1A2.503 2.503 0 007 1.5V8H3.5A2.503 2.503 0 001 10.5v1A2.503 2.503 0 003.5 14H10v4.5a2.503 2.503 0 002.5 2.5h1a2.503 2.503 0 002.5-2.5V14h2.5a2.503 2.503 0 002.5-2.5v-1A2.503 2.503 0 0016.5 8z" opacity=".4"/><path d="M13 8V1.5C13 .673 12.327 0 11.5 0h-1C9.673 0 9 .673 9 1.5V8H3.5C1.57 8 0 9.57 0 11.5v1C0 14.43 1.57 16 3.5 16H9v2.5c0 .827.673 1.5 1.5 1.5h1c.827 0 1.5-.673 1.5-1.5V16h5.5c1.93 0 3.5-1.57 3.5-3.5v-1C20 9.57 18.43 8 16.5 8H13z"/></svg>
+                Save All Data to HTML
+            </button>
+            <button id="exportTakeOffButton" class="btn btn-secondary w-full sm:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" /></svg>
+                Export Take-Off to Excel
+            </button>
+        </section>
+
+        <footer class="text-center text-sm text-gray-500 mt-12">
+            <p>&copy; <span id="currentYear"></span> Quantity Survey App. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <div id="genericModal" class="modal"> <div class="modal-content">
+            <div class="flex justify-between items-center mb-4"><h3 id="modalTitle" class="text-xl font-semibold text-gray-800">Modal Title</h3><button id="closeModalBtn" class="text-gray-600 hover:text-gray-900 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
+            <div id="modalBody" class="modal-body"><p>Modal content goes here...</p></div>
+            <div class="mt-6 text-right space-x-3">
+                <button id="modalCopyBtn" class="btn btn-primary">Copy to Clipboard</button>
+                <button id="modalCloseBtnFooter" class="btn bg-gray-200 hover:bg-gray-300 text-gray-700">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-analytics.js";
+      // TODO: Add SDKs for Firebase products that you want to use
+      // https://firebase.google.com/docs/web/setup#available-libraries
+
+      // Your web app's Firebase configuration
+      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+      const firebaseConfig = {
+        apiKey: "AIzaSyDJz-_tWyqZeSQwifD6Fp6GVgQxIKGhUDI",
+        authDomain: "dna-qs-app.firebaseapp.com",
+        projectId: "dna-qs-app",
+        storageBucket: "dna-qs-app.firebasestorage.app",
+        messagingSenderId: "664437674701",
+        appId: "1:664437674701:web:1816bf09352f8b0241cf84",
+        measurementId: "G-3TF7RZVHTX"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+    </script>
+    <script>
+        // --- IMPORTANT: For Standalone Use (opening HTML directly in browser) ---
+        // This is the Google AI API Key, different from Firebase API Key
+        const USER_PROVIDED_API_KEY = "AIzaSyC_ZKrs8AAk3dYuFj3KcDK5-5JUmMT5iT4"; 
+
+        // --- Storage Keys ---
+        const DB_ITEMS_STORAGE_KEY = 'quantitySurvey_dbItems_v7_enhanced'; 
+        const TAKEOFF_ITEMS_STORAGE_KEY = 'quantitySurvey_takeOffItems_v7_enhanced';
+        const PROJECT_INFO_STORAGE_KEY = 'quantitySurvey_projectInfo_v7_enhanced'; 
+        const BACKGROUND_IMAGE_STORAGE_KEY = 'quantitySurvey_backgroundImage_v7_enhanced';
+
+        // --- Global State & DOM Elements ---
+        let dbItems = []; 
+        let takeOffItems = []; 
+        let projectInfo = { 
+            docDate: new Date().toISOString().split('T')[0],
+            docRevision: '0',
+            docNum: '001'
+        };
+        let activeTab = 'databaseTab';
+
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const surveyForm = document.getElementById('surveyForm');
+        const itemNameInput = document.getElementById('itemName');
+        const categoryInput = document.getElementById('category');
+        const descriptionInput = document.getElementById('description');
+        const suggestDescriptionBtn = document.getElementById('suggestDescriptionBtn');
+        const descriptionLoader = document.getElementById('descriptionLoader');
+        const quantityInput = document.getElementById('quantity');
+        const unitInput = document.getElementById('unit');
+        const priceRateInput = document.getElementById('priceRate');
+        const avgMarketPriceInput = document.getElementById('avgMarketPrice');
+        const fetchAvgMarketPriceBtn = document.getElementById('fetchAvgMarketPriceBtn');
+        const avgMarketPriceLoader = document.getElementById('avgMarketPriceLoader');
+        const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+        const mainTableBody = document.getElementById('mainTableBody'); 
+        const takeOffForm = document.getElementById('takeOffForm');
+        const takeOffItemSelect = document.getElementById('takeOffItemSelect');
+        const takeOffQuantityInput = document.getElementById('takeOffQuantity');
+        const takeOffItemCategoryDisplay = document.getElementById('takeOffItemCategoryDisplay');
+        const takeOffItemUnitDisplay = document.getElementById('takeOffItemUnitDisplay');
+        const takeOffItemRateDisplay = document.getElementById('takeOffItemRateDisplay');
+        const takeOffItemDescriptionDisplay = document.getElementById('takeOffItemDescriptionDisplay');
+        const takeOffListTableBody = document.getElementById('takeOffListTableBody');
+        const saveToFileButton = document.getElementById('saveToFileButton');
+        const exportTakeOffButton = document.getElementById('exportTakeOffButton');
+        const currentTimeDisplay = document.getElementById('currentTime');
+        const docDateInput = document.getElementById('docDate');
+        const docRevisionInput = document.getElementById('docRevision');
+        const docNumInput = document.getElementById('docNum');
+        const projectDateInput = document.getElementById('projectDate');
+        const clientNameInput = document.getElementById('clientName');
+        const projectNameInput = document.getElementById('projectName');
+        const projectLocationInput = document.getElementById('projectLocation');
+        const generateScopeSummaryBtn = document.getElementById('generateScopeSummaryBtn');
+        const scopeLoader = document.getElementById('scopeLoader');
+        const genericModal = document.getElementById('genericModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalCloseBtnFooter = document.getElementById('modalCloseBtnFooter');
+        const modalCopyBtn = document.getElementById('modalCopyBtn');
+        const tabDatabaseBtn = document.getElementById('tabDatabaseBtn');
+        const tabTakeOffBtn = document.getElementById('tabTakeOffBtn');
+        const databaseTabContent = document.getElementById('databaseTab');
+        const takeOffTabContent = document.getElementById('takeOffTab');
+        const iconProjectInfo = document.getElementById('iconProjectInfo');
+        const iconAddItemDb = document.getElementById('iconAddItemDb');
+        const iconItemDbList = document.getElementById('iconItemDbList');
+        const iconAddItemTakeOff = document.getElementById('iconAddItemTakeOff');
+        const iconTakeOffList = document.getElementById('iconTakeOffList');
+
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        const icons = { 
+            projectInfo: `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" class="section-title-icon animated-icon" fill="currentColor"><path d="M3 2h10v1H3zM3 4h10v1H3zM3 6h7v1H3zM3 9h10v1H3zM3 11h10v1H3zM3 13h7v1H3zM12 6h1v7h-1z"/><rect x="4" y="7" width="1" height="1" fill="var(--primary-color)"><animate attributeName="fill" values="var(--primary-color);var(--primary-color);var(--danger-color);var(--danger-color);var(--primary-color)" dur="2s" repeatCount="indefinite" /></rect></svg>`,
+            addItemDb: `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" class="section-title-icon animated-icon" fill="currentColor"><path d="M2 2h12v12H2zM7 4h2v3h3v2H9v3H7V9H4V7h3z"/><rect x="7.5" y="7.5" width="1" height="1" fill="var(--primary-color)"><animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite" /></rect></svg>`,
+            itemDbList: `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" class="section-title-icon animated-icon" fill="currentColor"><path d="M4 2h8v2H4zM3 5h10v1H3zM3 7h10v1H3zM3 9h10v1H3zM3 11h10v1H3zM4 13h8v2H4zM6 6h1v5H6zM9 6h1v5H9z"><animateTransform attributeName="transform" type="translate" values="0 0; 0 -0.3; 0 0" dur="1.8s" repeatCount="indefinite" /></path></svg>`,
+            addItemTakeOff: `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" class="section-title-icon animated-icon" fill="currentColor"><path d="M14 2H2v1h12zM2 4v8h1V4zm11 0v8h1V4zM3 13h10v1H3zM5 5h1v2H5zm2 0h1v2H7zm2 0h1v2H9zm2 0h1v2h-1zM5 8h6v1H5z"><animate attributeName="fill" values="currentColor;var(--accent-color);currentColor" dur="2.5s" repeatCount="indefinite" /></path></svg>`,
+            takeOffList: `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" class="section-title-icon animated-icon" fill="currentColor"><path d="M2 13h2V3H2v10zm3 0h2V5H5v8zm3 0h2V7H8v6zm3 0h2V2h-2v11zm3 0h2V9h-2v4z"><animate attributeName="opacity" values="1;0.6;1" dur="1.5s" repeatCount="indefinite" /></path></svg>`
+        };
+
+        function setPixelArtIcons() {
+            if(iconProjectInfo) iconProjectInfo.innerHTML = icons.projectInfo;
+            if(iconAddItemDb) iconAddItemDb.innerHTML = icons.addItemDb;
+            if(iconItemDbList) iconItemDbList.innerHTML = icons.itemDbList;
+            if(iconAddItemTakeOff) iconAddItemTakeOff.innerHTML = icons.addItemTakeOff;
+            if(iconTakeOffList) iconTakeOffList.innerHTML = icons.takeOffList;
+        }
+
+        const formatCurrency = (amount) => `RM ${parseFloat(amount).toFixed(2)}`;
+        
+        function calculateDbItemTotal() { 
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const priceRate = parseFloat(priceRateInput.value) || 0;
+            totalAmountDisplay.value = formatCurrency(quantity * priceRate);
+        }
+
+        function updateCurrentTime() { 
+            const now = new Date(); const hours = now.getHours();
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = (hours % 12 || 12).toString().padStart(2, '0');
+            currentTimeDisplay.textContent = `${displayHours}:${minutes} ${ampm}`;
+        }
+        
+        function switchTab(tabId) { 
+            activeTab = tabId;
+            [databaseTabContent, takeOffTabContent].forEach(tc => tc.classList.add('hidden'));
+            [tabDatabaseBtn, tabTakeOffBtn].forEach(tb => tb.classList.remove('active'));
+            document.getElementById(tabId).classList.remove('hidden');
+            if (tabId === 'databaseTab') tabDatabaseBtn.classList.add('active');
+            else if (tabId === 'takeOffTab') tabTakeOffBtn.classList.add('active');
+            if (tabId === 'takeOffTab') populateTakeOffItemSelect();
+        }
+        tabDatabaseBtn.addEventListener('click', () => switchTab('databaseTab'));
+        tabTakeOffBtn.addEventListener('click', () => switchTab('takeOffTab'));
+
+        function showModal(title, content) {
+            modalTitle.textContent = title; 
+            modalBody.innerHTML = content.replace(/\n/g, '<br>'); 
+            genericModal.classList.remove('opacity-0', 'hidden'); 
+            genericModal.classList.add('open'); 
+        }
+        function hideModal() { 
+            genericModal.classList.remove('open');
+            setTimeout(() => { 
+                genericModal.classList.add('opacity-0', 'hidden');
+            }, 300);
+        }
+        closeModalBtn.addEventListener('click', hideModal);
+        modalCloseBtnFooter.addEventListener('click', hideModal);
+        modalCopyBtn.addEventListener('click', () => { 
+            const textToCopy = modalBody.innerText; 
+            if (navigator.clipboard && window.isSecureContext) { 
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => alert('Content copied to clipboard!'))
+                    .catch(err => { fallbackCopyTextToClipboard(textToCopy); });
+            } else { fallbackCopyTextToClipboard(textToCopy); }
+        });
+        function fallbackCopyTextToClipboard(text) { 
+            const textArea = document.createElement("textarea");
+            textArea.value = text; textArea.style.position = "fixed"; textArea.style.top = "0"; textArea.style.left = "0";
+            document.body.appendChild(textArea); textArea.focus(); textArea.select();
+            try { const successful = document.execCommand('copy'); alert(successful ? 'Content copied (fallback)!' : 'Copy failed (fallback).'); }
+            catch (err) { alert('Copy failed (fallback).'); }
+            document.body.removeChild(textArea);
+        }
+
+        function saveAllDataToLocalStorage() { 
+            try {
+                localStorage.setItem(DB_ITEMS_STORAGE_KEY, JSON.stringify(dbItems));
+                localStorage.setItem(TAKEOFF_ITEMS_STORAGE_KEY, JSON.stringify(takeOffItems));
+                projectInfo = { 
+                    date: projectDateInput.value, 
+                    client: clientNameInput.value, 
+                    project: projectNameInput.value, 
+                    location: projectLocationInput.value,
+                    docDate: docDateInput.value, 
+                    docRevision: docRevisionInput.value,
+                    docNum: docNumInput.value
+                };
+                localStorage.setItem(PROJECT_INFO_STORAGE_KEY, JSON.stringify(projectInfo));
+            } catch (e) { console.warn("Error saving data to localStorage:", e); }
+        }
+
+        function initializeApplicationData() { 
+            const embeddedDataScript = document.getElementById('embeddedSurveyData');
+            let dataLoadedFromEmbedded = false;
+            if (embeddedDataScript && embeddedDataScript.textContent.trim() !== 'null' && embeddedDataScript.textContent.trim() !== '') {
+                try {
+                    const parsedData = JSON.parse(embeddedDataScript.textContent);
+                    if (parsedData && typeof parsedData === 'object') {
+                        dbItems = Array.isArray(parsedData.dbItems) ? parsedData.dbItems : [];
+                        takeOffItems = Array.isArray(parsedData.takeOffItems) ? parsedData.takeOffItems : [];
+                        projectInfo = typeof parsedData.projectInfo === 'object' ? parsedData.projectInfo : { 
+                            docDate: new Date().toISOString().split('T')[0], docRevision: '0', docNum: '001' 
+                        };
+                        dataLoadedFromEmbedded = true;
+                    }
+                } catch (e) { 
+                    console.error("Error parsing embedded data:", e); 
+                    projectInfo = { docDate: new Date().toISOString().split('T')[0], docRevision: '0', docNum: '001' };
+                }
+            }
+
+            if (!dataLoadedFromEmbedded) {
+                const storedDbItems = localStorage.getItem(DB_ITEMS_STORAGE_KEY);
+                if (storedDbItems) try { dbItems = JSON.parse(storedDbItems); } catch (e) { dbItems = []; }
+                const storedTakeOffItems = localStorage.getItem(TAKEOFF_ITEMS_STORAGE_KEY);
+                if (storedTakeOffItems) try { takeOffItems = JSON.parse(storedTakeOffItems); } catch (e) { takeOffItems = []; }
+                const storedProjectInfo = localStorage.getItem(PROJECT_INFO_STORAGE_KEY);
+                if (storedProjectInfo) {
+                    try { projectInfo = JSON.parse(storedProjectInfo); } 
+                    catch (e) { projectInfo = { docDate: new Date().toISOString().split('T')[0], docRevision: '0', docNum: '001' }; }
+                } else { 
+                    projectInfo = { 
+                        ...projectInfo, 
+                        docDate: projectInfo.docDate || new Date().toISOString().split('T')[0],
+                        docRevision: projectInfo.docRevision || '0',
+                        docNum: projectInfo.docNum || '001'
+                    };
+                }
+            }
+            
+            projectDateInput.value = projectInfo.date || new Date().toISOString().split('T')[0];
+            clientNameInput.value = projectInfo.client || '';
+            projectNameInput.value = projectInfo.project || '';
+            projectLocationInput.value = projectInfo.location || '';
+            docDateInput.value = projectInfo.docDate || new Date().toISOString().split('T')[0];
+            docRevisionInput.value = projectInfo.docRevision || '0';
+            docNumInput.value = projectInfo.docNum || '001';
+        }
+        
+        function generateHtmlWithData() { 
+            const clonedDocElement = document.documentElement.cloneNode(true);
+            let dataScriptElement = clonedDocElement.querySelector('#embeddedSurveyData');
+            if (!dataScriptElement) { /* ... create if not exists ... */ }
+            const currentProjectInfo = { 
+                date: projectDateInput.value, client: clientNameInput.value, 
+                project: projectNameInput.value, location: projectLocationInput.value,
+                docDate: docDateInput.value, docRevision: docRevisionInput.value, docNum: docNumInput.value
+            };
+            dataScriptElement.textContent = JSON.stringify({ dbItems, takeOffItems, projectInfo: currentProjectInfo });
+            return "<!DOCTYPE html>\n" + clonedDocElement.outerHTML;
+        }
+
+        [quantityInput, priceRateInput].forEach(el => el.addEventListener('input', calculateDbItemTotal));
+        [projectDateInput, clientNameInput, projectNameInput, projectLocationInput, 
+         docDateInput, docRevisionInput, docNumInput 
+        ].forEach(input => {
+            input.addEventListener('change', saveAllDataToLocalStorage);
+        });
+
+        surveyForm.addEventListener('submit', function(event) { 
+            event.preventDefault();
+            if (!itemNameInput.value || !categoryInput.value || !unitInput.value || !priceRateInput.value) {
+                alert("Item Name, Category, Unit, and Your Price Rate are required."); return;
+            }
+            const newItem = {
+                id: 'db_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                itemName: itemNameInput.value, category: categoryInput.value, description: descriptionInput.value,
+                quantity: parseFloat(quantityInput.value) || 1, 
+                unit: unitInput.value, priceRate: parseFloat(priceRateInput.value),
+                avgMarketPrice: avgMarketPriceInput.value 
+            };
+            newItem.totalAmount = newItem.quantity * newItem.priceRate;
+            dbItems.push(newItem);
+            saveAllDataToLocalStorage(); renderMainTable(); populateTakeOffItemSelect(); 
+            surveyForm.reset(); descriptionInput.value = ''; quantityInput.value = '1'; avgMarketPriceInput.value = '';
+            calculateDbItemTotal(); itemNameInput.focus();
+        });
+
+        function populateTakeOffItemSelect() { 
+            takeOffItemSelect.innerHTML = '<option value="">-- Select an Item --</option>';
+            dbItems.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.itemName + ` (Rate: ${formatCurrency(item.priceRate)}/${item.unit})`;
+                takeOffItemSelect.appendChild(option);
+            });
+            if (takeOffItemSelect.value === "") updateTakeOffItemDetailsDisplay(null);
+        }
+        takeOffItemSelect.addEventListener('change', function() { 
+            const selectedDbItemId = this.value;
+            const dbItem = dbItems.find(item => item.id === selectedDbItemId);
+            updateTakeOffItemDetailsDisplay(dbItem);
+        });
+        function updateTakeOffItemDetailsDisplay(dbItem) { 
+            if (dbItem) {
+                takeOffItemCategoryDisplay.textContent = dbItem.category;
+                takeOffItemUnitDisplay.textContent = dbItem.unit;
+                takeOffItemRateDisplay.textContent = formatCurrency(dbItem.priceRate);
+                takeOffItemDescriptionDisplay.textContent = dbItem.description || '-';
+            } else {
+                takeOffItemCategoryDisplay.textContent = '-'; takeOffItemUnitDisplay.textContent = '-';
+                takeOffItemRateDisplay.textContent = '-'; takeOffItemDescriptionDisplay.textContent = '-';
+            }
+        }
+        takeOffForm.addEventListener('submit', function(event) { 
+            event.preventDefault();
+            const selectedDbItemId = takeOffItemSelect.value;
+            const quantityNeeded = parseFloat(takeOffQuantityInput.value);
+            if (!selectedDbItemId) { alert("Please select an item from the database."); return; }
+            if (isNaN(quantityNeeded) || quantityNeeded <= 0) { alert("Please enter a valid quantity needed."); return; }
+            const dbItem = dbItems.find(item => item.id === selectedDbItemId);
+            if (!dbItem) { alert("Selected database item not found. Please refresh."); return; }
+            const newTakeOffItem = {
+                id: 'to_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                dbItemId: dbItem.id, itemName: dbItem.itemName, category: dbItem.category,
+                description: dbItem.description, quantityNeeded: quantityNeeded, unit: dbItem.unit,
+                priceRate: dbItem.priceRate, totalAmount: quantityNeeded * dbItem.priceRate
+            };
+            takeOffItems.push(newTakeOffItem);
+            saveAllDataToLocalStorage(); renderTakeOffListTable(); takeOffForm.reset();
+            updateTakeOffItemDetailsDisplay(null); takeOffItemSelect.focus();
+        });
+        
+        function makeCellEditable(cell, item, field, itemArray, tableRenderFunc, isNumeric = false, isRate = false) { 
+            cell.ondblclick = function() { 
+                if (cell.querySelector('input, select')) return; 
+                const originalValue = item[field]; let inputElement;
+                if (field === 'category') { 
+                    inputElement = document.createElement('select');
+                    Array.from(categoryInput.options).forEach(opt => {
+                        const newOpt = document.createElement('option');
+                        newOpt.value = opt.value; newOpt.textContent = opt.textContent;
+                        if (opt.value === originalValue) newOpt.selected = true;
+                        inputElement.appendChild(newOpt);
+                    });
+                } else {
+                    inputElement = document.createElement('input');
+                    inputElement.type = isNumeric ? 'number' : 'text';
+                    if (isNumeric) inputElement.step = isRate ? '0.01' : 'any';
+                    inputElement.value = originalValue;
+                }
+                inputElement.className = 'w-full p-1 border border-indigo-500 rounded-md box-border text-xs'; // Ensure text-xs for input
+                cell.innerHTML = ''; cell.appendChild(inputElement); inputElement.focus();
+                const saveEdit = () => {
+                    let newValue = inputElement.value;
+                    if (isNumeric) { newValue = parseFloat(newValue); if (isNaN(newValue)) newValue = originalValue; }
+                    item[field] = newValue;
+                    if (itemArray === dbItems && (field === 'quantity' || field === 'priceRate')) {
+                        item.totalAmount = (item.quantity || 0) * (item.priceRate || 0);
+                    } else if (itemArray === takeOffItems && field === 'quantityNeeded') {
+                        item.totalAmount = (item.quantityNeeded || 0) * (item.priceRate || 0);
+                    }
+                    saveAllDataToLocalStorage(); tableRenderFunc(); 
+                };
+                inputElement.onblur = saveEdit;
+                inputElement.onkeydown = function(e) {
+                    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } 
+                    else if (e.key === 'Escape') { item[field] = originalValue; tableRenderFunc(); }
+                };
+            };
+        }
+        
+        function renderMainTable() { 
+            mainTableBody.innerHTML = '';
+            if (dbItems.length === 0) { mainTableBody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-gray-500 bg-white bg-opacity-90">No items in database.</td></tr>'; return; }
+            dbItems.forEach((item, index) => {
+                const row = mainTableBody.insertRow();
+                let cell = row.insertCell(); cell.textContent = item.itemName; makeCellEditable(cell, item, 'itemName', dbItems, renderMainTable);
+                cell = row.insertCell(); cell.textContent = item.category; makeCellEditable(cell, item, 'category', dbItems, renderMainTable);
+                cell = row.insertCell(); cell.textContent = item.description; cell.classList.add('description-cell'); makeCellEditable(cell, item, 'description', dbItems, renderMainTable);
+                cell = row.insertCell(); cell.textContent = item.quantity; cell.className = 'text-right'; makeCellEditable(cell, item, 'quantity', dbItems, renderMainTable, true);
+                cell = row.insertCell(); cell.textContent = item.unit; makeCellEditable(cell, item, 'unit', dbItems, renderMainTable);
+                cell = row.insertCell(); cell.textContent = formatCurrency(item.priceRate); cell.className = 'text-right'; makeCellEditable(cell, item, 'priceRate', dbItems, renderMainTable, true, true);
+                cell = row.insertCell(); cell.textContent = formatCurrency(item.totalAmount); cell.className = 'text-right font-semibold';
+                const actionsCell = row.insertCell(); actionsCell.className = 'text-center align-middle';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 hover:text-red-700 transition-colors" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>';
+                deleteBtn.title = "Delete Item from Database";
+                deleteBtn.className = "p-1 hover:bg-red-100 rounded-full";
+                deleteBtn.onclick = () => {
+                    if (confirm(`Delete "${item.itemName}" from database? This may affect Take-Off items if they use this item's rate.`)) {
+                        dbItems.splice(index, 1); saveAllDataToLocalStorage(); renderMainTable(); populateTakeOffItemSelect();
+                    }
+                };
+                actionsCell.appendChild(deleteBtn);
+                Array.from(row.cells).forEach(c => c.classList.add('table-cell'));
+            });
+        }
+        function renderTakeOffListTable() { 
+            takeOffListTableBody.innerHTML = '';
+            if (takeOffItems.length === 0) { takeOffListTableBody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-gray-500 bg-white bg-opacity-90">No items in take-off list.</td></tr>'; return; }
+            takeOffItems.forEach((item, index) => {
+                const row = takeOffListTableBody.insertRow();
+                row.insertCell().textContent = item.itemName; 
+                row.insertCell().textContent = item.category;
+                let descCell = row.insertCell(); descCell.textContent = item.description; descCell.classList.add('description-cell');
+                let qtyCell = row.insertCell(); qtyCell.textContent = item.quantityNeeded; qtyCell.className = 'text-right';
+                makeCellEditable(qtyCell, item, 'quantityNeeded', takeOffItems, renderTakeOffListTable, true);
+                row.insertCell().textContent = item.unit;
+                row.insertCell().textContent = formatCurrency(item.priceRate); row.cells[row.cells.length-1].className = 'text-right';
+                row.insertCell().textContent = formatCurrency(item.totalAmount); row.cells[row.cells.length-1].className = 'text-right font-semibold';
+                const actionsCell = row.insertCell(); actionsCell.className = 'text-center align-middle';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 hover:text-red-700 transition-colors" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>';
+                deleteBtn.title = "Remove Item from Take-Off";
+                deleteBtn.className = "p-1 hover:bg-red-100 rounded-full";
+                deleteBtn.onclick = () => {
+                    if (confirm(`Remove "${item.itemName}" from take-off list?`)) {
+                        takeOffItems.splice(index, 1); saveAllDataToLocalStorage(); renderTakeOffListTable();
+                    }
+                };
+                actionsCell.appendChild(deleteBtn);
+                Array.from(row.cells).forEach(c => c.classList.add('table-cell'));
+            });
+        }
+        
+        saveToFileButton.addEventListener('click', function() { 
+            if (dbItems.length === 0 && takeOffItems.length === 0 && !Object.values(projectInfo).some(val => val && val.toString().trim() !== '')) {
+                alert("There is no data to save to a file."); return;
+            }
+            const htmlContent = generateHtmlWithData(); const blob = new Blob([htmlContent], { type: 'text/html' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const projNameForFile = projectNameInput.value.replace(/[^a-z0-9]/gi, '_') || 'UntitledProject';
+            a.download = `QS_Data_${projNameForFile}_${timestamp}.html`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+            alert("A new HTML file with all your current data (Database & Take-Off) has been prepared for download.\n\nIMPORTANT: Save this new file. The file you are currently viewing has NOT been updated on your disk.");
+        });
+        exportTakeOffButton.addEventListener('click', function() { 
+            if (takeOffItems.length === 0) { alert("No items in the Take-Off list to export."); return; }
+            const projectDetails = [
+                {"Project Detail": "Document Number", "Value": `DNA - ${docDateInput.value} - Rev: ${docRevisionInput.value} - No: ${docNumInput.value}`},
+                {"Project Detail": "Project Date", "Value": projectDateInput.value}, 
+                {"Project Detail": "Client's Name", "Value": clientNameInput.value},
+                {"Project Detail": "Project's Name", "Value": projectNameInput.value}, 
+                {"Project Detail": "Location", "Value": projectLocationInput.value}, {}, 
+            ];
+            const itemData = takeOffItems.map(item => ({
+                "Item Name": item.itemName, "Category": item.category, "Description": item.description,
+                "Qty Needed": item.quantityNeeded, "Unit": item.unit,
+                "Price Rate (RM)": item.priceRate.toFixed(2), "Total Amount (RM)": item.totalAmount.toFixed(2)
+            }));
+            const ws = XLSX.utils.json_to_sheet(projectDetails, {skipHeader: true});
+            XLSX.utils.sheet_add_json(ws, itemData, {origin: -1, skipHeader: false}); 
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Take-Off Data");
+            const projNameForFile = projectNameInput.value.replace(/[^a-z0-9]/gi, '_') || 'UntitledProject';
+            XLSX.writeFile(wb, `QS_TakeOff_Export_${projNameForFile}.xlsx`);
+        });
+        
+        async function callGeminiAPI(prompt, loaderElement, buttonElement, isTextGeneration = true) { 
+            loaderElement.classList.remove('hidden'); 
+            if (buttonElement) buttonElement.disabled = true;
+            
+            let effectiveApiKey = "";
+            if (typeof window.__GOOGLE_API_KEY__ !== 'undefined' && window.__GOOGLE_API_KEY__) { 
+                effectiveApiKey = window.__GOOGLE_API_KEY__;
+            } else if (USER_PROVIDED_API_KEY) { 
+                effectiveApiKey = USER_PROVIDED_API_KEY;
+            } else { 
+                const errorMessage = "AI features require a user-provided API Key when this HTML is run directly in a browser. Please edit the USER_PROVIDED_API_KEY variable in the script.";
+                console.error(errorMessage);
+                if (loaderElement.id === 'descriptionLoader') descriptionInput.value = errorMessage;
+                else if (loaderElement.id === 'avgMarketPriceLoader') avgMarketPriceInput.value = errorMessage;
+                else if (loaderElement.id === 'scopeLoader') {
+                    showModal("API Key Required", errorMessage); 
+                }
+                loaderElement.classList.add('hidden'); 
+                if (buttonElement) buttonElement.disabled = false;
+                return `Error: API Key required.`;
+            }
+
+            let generatedOutput = "Error: Could not retrieve data from AI.";
+            try {
+                const payload = isTextGeneration ? 
+                    { contents: [{ role: "user", parts: [{ text: prompt }] }] } :
+                    { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1 } }; 
+
+                const modelName = isTextGeneration ? "gemini-1.5-flash-latest:generateContent" : "imagen-3.0-generate-002:predict"; // Updated Gemini model
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}?key=${effectiveApiKey}`;
+                
+                const response = await fetch(apiUrl, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload) 
+                });
+
+                if (!response.ok) { 
+                    const errorData = await response.json(); 
+                    throw new Error(`API failed: ${errorData.error?.message || response.statusText}`); 
+                }
+                const result = await response.json();
+
+                if (isTextGeneration) {
+                    if (result.candidates?.[0]?.content?.parts?.[0]?.text) { 
+                        generatedOutput = result.candidates[0].content.parts[0].text.trim(); 
+                    }
+                } else { 
+                    if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                        generatedOutput = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                    } else {
+                        generatedOutput = "Error: No image data received from Imagen.";
+                    }
+                }
+            } catch (error) { 
+                console.error('Gemini/Imagen API Error:', error); 
+                generatedOutput = `Error: ${error.message}.`; 
+            }
+            finally { 
+                loaderElement.classList.add('hidden'); 
+                if (buttonElement) buttonElement.disabled = false; 
+            }
+            return generatedOutput;
+        }
+
+        suggestDescriptionBtn.addEventListener('click', async function() { 
+            const itemName = itemNameInput.value.trim(); 
+            const category = categoryInput.value;
+            if (!itemName || !category) { 
+                alert("Item Name and Category are needed for suggestions."); 
+                return; 
+            }
+            
+            descriptionInput.value = "Generating elaborated description...";
+            descriptionLoader.classList.remove('hidden');
+            suggestDescriptionBtn.disabled = true;
+
+            const elaboratedPrompt = `Provide an elaborated and comprehensive technical description for a quantity surveying item, suitable for a detailed Bill of Quantities in Malaysia.
+Item Name: "${itemName}"
+Category: "${category}"
+The description should be:
+- Detailed and specific.
+- Use precise construction terminology and measurements where applicable.
+- Mention relevant Malaysian standards (e.g., MS standards) or common practices if appropriate.
+- Cover material specifications, installation methods, or scope of work clearly.
+- Aim for a professional and thorough tone.
+Example for Item Name "Reinforced Concrete Grade 25 (G25) Pile Cap" and Category "Substructure Works": "Supply, fabricate, and install reinforced concrete Grade 25 (G25) to pile caps, including formwork (state type, e.g., timber or steel), reinforcement bars (state type and yield strength, e.g., high tensile deformed bars T10-T25, FY460 N/mm2), concrete placement, vibrating, curing, and all necessary testing as per MS EN 1992-1-1 and project specifications. Measurement based on volume of concrete (m3)."
+Provide only the description text.`;
+            
+            let elaboratedDescription = await callGeminiAPI(elaboratedPrompt, descriptionLoader, null); 
+
+            if (elaboratedDescription.startsWith("Error:")) {
+                descriptionInput.value = elaboratedDescription; 
+                descriptionLoader.classList.add('hidden');
+                suggestDescriptionBtn.disabled = false; 
+                return;
+            }
+
+            descriptionInput.value = "Generating summary (max 150 words)..."; 
+
+            const summaryPrompt = `Summarize the following technical construction item description into its most important points. The summary must be concise and not exceed 150 words. Focus on key materials, actions, and critical specifications relevant for a Bill of Quantities.
+Original Description:
+---
+${elaboratedDescription}
+---
+Provide only the summarized description.`;
+
+            const summaryDescription = await callGeminiAPI(summaryPrompt, descriptionLoader, suggestDescriptionBtn); 
+            descriptionInput.value = summaryDescription;
+        });
+        
+        fetchAvgMarketPriceBtn.addEventListener('click', async function() {
+            const itemName = itemNameInput.value.trim();
+            const itemUnit = unitInput.value.trim();
+            if (!itemName) { alert("Please enter an Item Name to fetch its market price."); itemNameInput.focus(); return; }
+            if (!itemUnit) { alert("Please enter a Unit for the item."); unitInput.focus(); return; }
+
+            avgMarketPriceInput.value = "Fetching price...";
+            const prompt = `What is the estimated average market price in Malaysian Ringgit (RM) for one unit of "${itemName}" with the unit of "${itemUnit}" in Malaysia?
+Consider typical construction project contexts.
+Provide the price as a numerical value or a small range (e.g., "RM 150.00" or "RM 120.00 - RM 180.00").
+If an exact price is hard, provide the most common estimate. Output only the price or price range.`;
+            const priceSuggestion = await callGeminiAPI(prompt, avgMarketPriceLoader, fetchAvgMarketPriceBtn);
+            avgMarketPriceInput.value = priceSuggestion;
+        });
+
+
+        generateScopeSummaryBtn.addEventListener('click', async function() { 
+            if (takeOffItems.length === 0) { alert("Add items to the Take-Off list to generate a scope summary."); return; }
+            const client = clientNameInput.value.trim() || "the client";
+            const project = projectNameInput.value.trim() || "the project";
+            const location = projectLocationInput.value.trim() || "the specified location";
+            let itemsSummary = takeOffItems.map(item => `- ${item.itemName} (Qty: ${item.quantityNeeded} ${item.unit})`).join('\n');
+            if (itemsSummary.length > 1500) itemsSummary = itemsSummary.substring(0, 1500) + "\n... (and more items)";
+            const prompt = `Brief project scope summary for a QS document. Project: "${project}", Client: "${client}", Location: "${location}". Key items/categories from take-off:\n${itemsSummary}\nConcise paragraph or bullets. Context: Malaysia. Output only summary.`;
+            const summary = await callGeminiAPI(prompt, scopeLoader, generateScopeSummaryBtn);
+            showModal("✨ Project Scope Summary (from Take-Off)", `Generated scope summary:\n\n${summary}`);
+        });
+        
+        async function setDynamicBackgroundImage() {
+            const storedImage = localStorage.getItem(BACKGROUND_IMAGE_STORAGE_KEY);
+            if (storedImage) {
+                document.body.style.backgroundImage = `url('${storedImage}')`;
+                loadingOverlay.style.display = 'none';
+                return;
+            }
+
+            console.log("Generating background image with Imagen...");
+            const prompt = "A slightly blurred, professional, high-quality photo of a modern Malaysian construction site during the day. Focus on architectural elements and machinery, suitable as a subtle application background. Cinematic lighting.";
+            
+            const imageUrl = await callGeminiAPI(prompt, loadingOverlay.querySelector('.loader'), null, false); 
+
+            if (imageUrl && !imageUrl.startsWith("Error:")) {
+                document.body.style.backgroundImage = `url('${imageUrl}')`;
+                try { localStorage.setItem(BACKGROUND_IMAGE_STORAGE_KEY, imageUrl); } 
+                catch (e) { console.warn("Could not save background image to localStorage (it might be too large).", e); }
+            } else {
+                console.warn(imageUrl.startsWith("Error:") ? imageUrl : "No image data received from Imagen. Using fallback.");
+                document.body.style.backgroundImage = `url('https://placehold.co/1920x1080/667eea/ffffff?text=Construction+Background&font=raleway')`;
+            }
+            loadingOverlay.style.display = 'none';
+        }
+
+        async function initializeApp() {
+            setPixelArtIcons();
+            await setDynamicBackgroundImage(); 
+            
+            initializeApplicationData(); 
+            calculateDbItemTotal(); 
+            renderMainTable();
+            renderTakeOffListTable();
+            populateTakeOffItemSelect(); 
+            updateCurrentTime(); 
+            setInterval(updateCurrentTime, 1000);
+            switchTab('databaseTab'); 
+        }
+
+        initializeApp();
+        
+    </script>
+</body>
+</html>
